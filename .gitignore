@@ -8,4 +8,4 @@ __pycache__/
 build/
 
 # Uncomment the line below if you do NOT want to track/upload the compiled .exe file (dist folder)
-# dist/
+dist/
