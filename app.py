@@ -116,6 +116,109 @@ def input_moeda(label, default_value, key):
     val_float = parse_moeda(val_str)
     return val_float
 
+# --- DIALOG: DETALHAMENTO MATEMÁTICO ---
+@st.dialog("🧮 Detalhamento Matemático (Passo a Passo)", width="large")
+def exibir_detalhes_matematicos(res, hist_dec, hist_int, ap_atual, mens_atual, is_pj):
+    st.markdown("### 📋 Consolidação de Limites")
+    
+    if is_pj:
+        st.markdown("**Cenário Corporativo (Pessoa Jurídica)**")
+        st.markdown("Contribuições realizadas sob CNPJ (Pessoa Jurídica) possuem isenção total de IOF e não consomem o teto anual de isenção global de Pessoa Física.")
+        st.latex(r"IOF = 0,00")
+        st.latex(rf"R_{{\text{{líquida}}}} = {formata_br(ap_atual + mens_atual)}")
+        return
+        
+    st.markdown("#### 1. Histórico Prévio Acumulado")
+    st.markdown("O histórico prévio é a soma dos aportes declarados em outras instituições com os aportes internos na Sicoob Seguradora:")
+    st.latex(r"H_{\text{prévio}} = H_{\text{declarado}} + H_{\text{interno}}")
+    st.latex(rf"{formata_br(hist_dec + hist_int)} = {formata_br(hist_dec)} + {formata_br(hist_int)}")
+    
+    st.markdown("#### 2. Limite Isento Inicial Disponível")
+    st.markdown("O limite isento anual por CPF em 2026 é de **R$ 600.000,00**. O limite inicial disponível é o teto anual menos o histórico prévio acumulado:")
+    st.latex(r"L_{\text{inicial}} = \max(0, 600.000,00 - H_{\text{prévio}})")
+    lim_ini = max(0.0, 600000.0 - (hist_dec + hist_int))
+    st.latex(rf"{formata_br(lim_ini)} = \max(0, 600.000,00 - {formata_br(hist_dec + hist_int)})")
+    
+    st.divider()
+    
+    st.markdown("### ⚡ 1. Contribuição Eventual (Aporte Avulso)")
+    st.markdown("O aporte eventual consome o limite disponível prioritariamente.")
+    
+    if ap_atual <= lim_ini:
+        st.markdown("**Cenário A: Aporte dentro do limite disponível**")
+        st.latex(rf"A_{{\text{{atual}}}} \le L_{{\text{{inicial}}}} \quad ({formata_br(ap_atual)} \le {formata_br(lim_ini)})")
+        st.markdown("Como o aporte atual é menor ou igual ao limite disponível, toda a contribuição é isenta de IOF.")
+        st.latex(rf"A_{{\text{{isento}}}} = A_{{\text{{atual}}}} = {formata_br(ap_atual)}")
+        st.latex(r"A_{\text{tributável}} = 0,00")
+        st.latex(r"IOF_{A} = 0,00")
+        st.latex(rf"R_{{\text{{líquida, A}}}} = A_{{\text{{atual}}}} = {formata_br(ap_atual)}")
+        lim_rest = lim_ini - ap_atual
+        st.latex(r"L_{\text{restante}} = L_{\text{inicial}} - A_{\text{atual}}")
+        st.latex(rf"{formata_br(lim_rest)} = {formata_br(lim_ini)} - {formata_br(ap_atual)}")
+    else:
+        st.markdown("**Cenário B: Aporte excede o limite disponível**")
+        st.latex(rf"A_{{\text{{atual}}}} > L_{{\text{{inicial}}}} \quad ({formata_br(ap_atual)} > {formata_br(lim_ini)})")
+        st.markdown("A parcela dentro do limite é isenta. O excedente é tributado.")
+        st.latex(rf"A_{{\text{{isento}}}} = L_{{\text{{inicial}}}} = {formata_br(lim_ini)}")
+        trib_a = ap_atual - lim_ini
+        st.latex(r"A_{\text{tributável}} = A_{\text{atual}} - L_{\text{inicial}}")
+        st.latex(rf"{formata_br(trib_a)} = {formata_br(ap_atual)} - {formata_br(lim_ini)}")
+        
+        st.markdown("O cálculo do **IOF 'Por Dentro'** (alíquota de 5%) divide a parcela tributável por 1,05 para encontrar a base de cálculo líquida, retendo 5% sobre esta base:")
+        st.latex(r"BC_{A} = \frac{A_{\text{tributável}}}{1,05}")
+        bc_a = trib_a / 1.05
+        st.latex(rf"{formata_br(bc_a)} = \frac{{{formata_br(trib_a)}}}{{1,05}}")
+        
+        st.latex(r"IOF_{A} = BC_{A} \times 0,05")
+        iof_a = bc_a * 0.05
+        st.latex(rf"{formata_br(iof_a)} = {formata_br(bc_a)} \times 0,05")
+        
+        st.markdown("A reserva líquida efetiva do aporte é a soma da parcela isenta com a base de cálculo líquida do excedente:")
+        st.latex(r"R_{\text{líquida, A}} = A_{\text{isento}} + BC_{A}")
+        st.latex(rf"{formata_br(lim_ini + bc_a)} = {formata_br(lim_ini)} + {formata_br(bc_a)}")
+        st.markdown("*(Nota de conciliação: Reserva Líquida + IOF = Valor Bruto)*")
+        st.latex(rf"{formata_br(lim_ini + bc_a)} + {formata_br(iof_a)} = {formata_br(ap_atual)}")
+        
+        lim_rest = 0.0
+        st.latex(r"L_{\text{restante}} = 0,00")
+        
+    st.divider()
+    
+    st.markdown("### 📅 2. Contribuição Programada Mensal")
+    st.markdown("A mensalidade consome o limite restante após a eventual.")
+    
+    if mens_atual <= lim_rest:
+        st.markdown("**Cenário A: Mensalidade dentro do limite restante**")
+        st.latex(rf"M_{{\text{{atual}}}} \le L_{{\text{{restante}}}} \quad ({formata_br(mens_atual)} \le {formata_br(lim_rest)})")
+        st.markdown("Como a mensalidade atual é menor ou igual ao limite restante, toda a contribuição é isenta de IOF.")
+        st.latex(rf"M_{{\text{{isenta}}}} = M_{{\text{{atual}}}} = {formata_br(mens_atual)}")
+        st.latex(r"M_{\text{tributável}} = 0,00")
+        st.latex(r"IOF_{M} = 0,00")
+        st.latex(rf"R_{{\text{{líquida, M}}}} = M_{{\text{{atual}}}} = {formata_br(mens_atual)}")
+    else:
+        st.markdown("**Cenário B: Mensalidade excede o limite restante**")
+        st.latex(rf"M_{{\text{{atual}}}} > L_{{\text{{restante}}}} \quad ({formata_br(mens_atual)} > {formata_br(lim_rest)})")
+        st.markdown("A parcela dentro do limite é isenta. O excedente é tributado.")
+        st.latex(rf"M_{{\text{{isenta}}}} = L_{{\text{{restante}}}} = {formata_br(lim_rest)}")
+        trib_m = mens_atual - lim_rest
+        st.latex(r"M_{\text{tributável}} = M_{\text{atual}} - L_{\text{restante}}")
+        st.latex(rf"{formata_br(trib_m)} = {formata_br(mens_atual)} - {formata_br(lim_rest)}")
+        
+        st.markdown("O cálculo do **IOF 'Por Dentro'** (alíquota de 5%) divide a parcela tributável por 1,05 para encontrar a base de cálculo líquida, retendo 5% sobre esta base:")
+        st.latex(r"BC_{M} = \frac{M_{\text{tributável}}}{1,05}")
+        bc_m = trib_m / 1.05
+        st.latex(rf"{formata_br(bc_m)} = \frac{{{formata_br(trib_m)}}}{{1,05}}")
+        
+        st.latex(r"IOF_{M} = BC_{M} \times 0,05")
+        iof_m = bc_m * 0.05
+        st.latex(rf"{formata_br(iof_m)} = {formata_br(bc_m)} \times 0,05")
+        
+        st.markdown("A reserva líquida efetiva da mensalidade é a soma da parcela isenta com a base de cálculo líquida do excedente:")
+        st.latex(r"R_{\text{líquida, M}} = M_{\text{isenta}} + BC_{M}")
+        st.latex(rf"{formata_br(lim_rest + bc_m)} = {formata_br(lim_rest)} + {formata_br(bc_m)}")
+        st.markdown("*(Nota de conciliação: Reserva Líquida + IOF = Valor Bruto)*")
+        st.latex(rf"{formata_br(lim_rest + bc_m)} + {formata_br(iof_m)} = {formata_br(mens_atual)}")
+
 # --- INTERFACE DO USUÁRIO (FRONT-END) ---
 st.title("🛡️ Simulador de Retenção de IOF - VGBL (Regras 2026)")
 st.markdown("Validação da esteira de cálculo de IOF 'Por Dentro' considerando o teto global de **R$ 600.000,00**.")
@@ -192,7 +295,13 @@ with quadrante_esquerdo:
 # === QUADRANTE DIREITO: MEMÓRIA DE CÁLCULO E AUDITORIA ===
 with quadrante_direito:
     st.subheader("📊 Auditoria Tributária (Memória de Cálculo)")
-    st.markdown(f"**Status:** `{resultado['status']}`")
+    
+    col_status, col_btn = st.columns([3, 2])
+    with col_status:
+        st.markdown(f"**Status:** `{resultado['status']}`")
+    with col_btn:
+        if st.button("🧮 Ver Matemática", use_container_width=True):
+            exibir_detalhes_matematicos(resultado, hist_declarado, hist_interno, aporte_atual, mensalidade_atual, is_pj)
     
     # Preparação das variáveis para a visão consolidada
     historico_previo = resultado['historico_total_previo']
