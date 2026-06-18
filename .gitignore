@@ -1,0 +1,11 @@
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# PyInstaller build files
+build/
+
+# Uncomment the line below if you do NOT want to track/upload the compiled .exe file (dist folder)
+# dist/
